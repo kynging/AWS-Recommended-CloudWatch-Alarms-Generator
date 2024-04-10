@@ -1,0 +1,370 @@
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: aws-recommended-cloudwatch-alarms-generator
+    Description: Auto creates CloudWatch Alarms for AWS recommended alarms https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html
+    Author: Yinan Ke
+    SpdxLicenseId: Apache-2.0
+    LicenseUrl: s3://kyn-app-tokyo/AWS-Recommended-CloudWatch-Alarms-Generator/3b83ef96387f14655fc854ddc3c6bd57
+    ReadmeUrl: s3://kyn-app-tokyo/AWS-Recommended-CloudWatch-Alarms-Generator/e2b06b17a5bade74e1794043c75fe725
+    Labels:
+    - CloudFormation
+    - CloudWatch
+    - Eventbridge
+    HomePageUrl: https://github.com/kynging/AWS-Recommended-CloudWatch-Alarms-Generator
+    SemanticVersion: 1.0.0
+    SourceCodeUrl: https://github.com/kynging/AWS-Recommended-CloudWatch-Alarms-Generator
+Parameters:
+  AlarmNotificationTopic:
+    Type: String
+    Description: "SNS topic to send notifications.\n Sample: arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::Account}:AlarmNotificationTopic"
+  ContainerInsightsAlarms:
+    Description: Specify whether to enable ContainerInsights CloudWatch Alarms
+    Type: String
+    AllowedValues:
+    - Enabled
+    - Disabled
+    Default: Enabled
+  CWAgentAlarms:
+    Description: Specify whether to enable CWAgent CloudWatch Alarms
+    Type: String
+    AllowedValues:
+    - Enabled
+    - Disabled
+    Default: Enabled
+  EC2Alarms:
+    Description: Specify whether to enable EC2 CloudWatch Alarms
+    Type: String
+    AllowedValues:
+    - Enabled
+    - Disabled
+    Default: Enabled
+  ElastiCacheAlarms:
+    Description: Specify whether to enable ElastiCache CloudWatch Alarms
+    Type: String
+    AllowedValues:
+    - Enabled
+    - Disabled
+    Default: Enabled
+  RDSAlarms:
+    Description: Specify whether to enable RDS CloudWatch Alarms
+    Type: String
+    AllowedValues:
+    - Enabled
+    - Disabled
+    Default: Enabled
+Conditions:
+  EC2AlarmsEnabled:
+    Fn::Equals:
+    - Ref: EC2Alarms
+    - Enabled
+  CWAgentAlamrsEnabled:
+    Fn::Equals:
+    - Ref: CWAgentAlarms
+    - Enabled
+  ContainerInsightsAlarmsEnabled:
+    Fn::Equals:
+    - Ref: ContainerInsightsAlarms
+    - Enabled
+  ElastiCacheAlarmsEnabled:
+    Fn::Equals:
+    - Ref: ElastiCacheAlarms
+    - Enabled
+  RDSAlarmsEnabled:
+    Fn::Equals:
+    - Ref: RDSAlarms
+    - Enabled
+Resources:
+  CloudFormationBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Sub: cloudwatch-alarms-generator-${AWS::AccountId}-${AWS::Region}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: aws:kms
+            KMSMasterKeyID: alias/aws/s3
+      PublicAccessBlockConfiguration:
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+    Metadata:
+      SamResourceId: CloudFormationBucket
+  CloudFormationBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: CloudFormationBucket
+      PolicyDocument:
+        Id: RequireEncryptionInTransit
+        Version: '2012-10-17'
+        Statement:
+        - Principal: '*'
+          Action: '*'
+          Effect: Deny
+          Resource:
+          - Fn::GetAtt:
+            - CloudFormationBucket
+            - Arn
+          - Fn::Sub: ${CloudFormationBucket.Arn}/*
+          Condition:
+            Bool:
+              aws:SecureTransport: 'false'
+    Metadata:
+      SamResourceId: CloudFormationBucketPolicy
+  AlarmsGeneratorLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      RoleName: AlarmsGeneratorLambdaExecutionRole
+      Description: Lambda Execution Role for granting access to CloudWatch and CloudFormation
+        to generate CloudWatch Alarms
+      Policies:
+      - PolicyName: AlarmsGeneratorPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - CloudFormation:DescribeStacks
+            - CloudFormation:CreateStack
+            - CloudFormation:UpdateStack
+            Resource:
+              Fn::Sub: arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/CloudWatchAlarms*
+          - Effect: Allow
+            Action:
+            - cloudwatch:ListMetrics
+            - cloudwatch:PutMetricAlarm
+            - cloudwatch:DeleteAlarms
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource:
+              Fn::Sub: arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}*:*
+          - Effect: Allow
+            Action:
+            - S3:GetObject
+            - S3:PutObject
+            Resource:
+              Fn::Sub: arn:${AWS::Partition}:s3:::${CloudFormationBucket}/*
+    Metadata:
+      SamResourceId: AlarmsGeneratorLambdaExecutionRole
+  EC2AlarmsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description:
+        Fn::Sub:
+        - Stack ${AWS::StackName} Function ${ResourceName}
+        - ResourceName: EC2AlarmsFunction
+      CodeUri: s3://kyn-app-tokyo/AWS-Recommended-CloudWatch-Alarms-Generator/6dbabb0e54743349246e0881eb95d772
+      Handler: lambda_function.lambda_handler
+      Environment:
+        Variables:
+          NOTIFICATION_TOPIC:
+            Ref: AlarmNotificationTopic
+          S3_BUCKET:
+            Ref: CloudFormationBucket
+      Runtime: python3.10
+      MemorySize: 256
+      Timeout: 60
+      Tracing: Active
+      Role:
+        Fn::GetAtt:
+        - AlarmsGeneratorLambdaExecutionRole
+        - Arn
+      Events:
+        CronEvent:
+          Type: Schedule
+          Properties:
+            Schedule: cron(00 23 * * ? *)
+            Name: EC2AlarmsSchedule
+            Description: Trigger Lambda at 23:00 PM daily
+    Condition: EC2AlarmsEnabled
+    Metadata:
+      SamResourceId: EC2AlarmsFunction
+  EC2AlarmsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/lambda/${EC2AlarmsFunction}
+    Condition: EC2AlarmsEnabled
+    Metadata:
+      SamResourceId: EC2AlarmsFunctionLogGroup
+  CWAgentAlarmsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description:
+        Fn::Sub:
+        - Stack ${AWS::StackName} Function ${ResourceName}
+        - ResourceName: CWAgentAlarmsFunction
+      CodeUri: s3://kyn-app-tokyo/AWS-Recommended-CloudWatch-Alarms-Generator/02b34c5412f6a12fad873bfb18a8dbdb
+      Handler: lambda_function.lambda_handler
+      Environment:
+        Variables:
+          NOTIFICATION_TOPIC:
+            Ref: AlarmNotificationTopic
+          S3_BUCKET:
+            Ref: CloudFormationBucket
+      Runtime: python3.10
+      MemorySize: 256
+      Timeout: 60
+      Tracing: Active
+      Role:
+        Fn::GetAtt:
+        - AlarmsGeneratorLambdaExecutionRole
+        - Arn
+      Events:
+        CronEvent:
+          Type: Schedule
+          Properties:
+            Schedule: cron(00 23 * * ? *)
+            Name: CWAgentAlarmsSchedule
+            Description: Trigger Lambda at 23:00 PM daily
+    Condition: CWAgentAlamrsEnabled
+    Metadata:
+      SamResourceId: CWAgentAlarmsFunction
+  CWAgentAlarmsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/lambda/${CWAgentAlarmsFunction}
+    Condition: CWAgentAlamrsEnabled
+    Metadata:
+      SamResourceId: CWAgentAlarmsFunctionLogGroup
+  ContainerInsightsAlarmsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description:
+        Fn::Sub:
+        - Stack ${AWS::StackName} Function ${ResourceName}
+        - ResourceName: ContainerInsightsAlarmsFunction
+      CodeUri: s3://kyn-app-tokyo/AWS-Recommended-CloudWatch-Alarms-Generator/7c083902e7bcd03baf982fe092ee7220
+      Handler: lambda_function.lambda_handler
+      Environment:
+        Variables:
+          NOTIFICATION_TOPIC:
+            Ref: AlarmNotificationTopic
+          S3_BUCKET:
+            Ref: CloudFormationBucket
+      Runtime: python3.10
+      MemorySize: 256
+      Timeout: 60
+      Tracing: Active
+      Role:
+        Fn::GetAtt:
+        - AlarmsGeneratorLambdaExecutionRole
+        - Arn
+      Events:
+        CronEvent:
+          Type: Schedule
+          Properties:
+            Schedule: cron(00 23 * * ? *)
+            Name: ContainerInsightsAlarmsSchedule
+            Description: Trigger Lambda at 23:00 PM daily
+    Condition: ContainerInsightsAlarmsEnabled
+    Metadata:
+      SamResourceId: ContainerInsightsAlarmsFunction
+  ContainerInsightsAlarmsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/lambda/${ContainerInsightsAlarmsFunction}
+    Condition: ContainerInsightsAlarmsEnabled
+    Metadata:
+      SamResourceId: ContainerInsightsAlarmsFunctionLogGroup
+  ElastiCacheAlarmsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description:
+        Fn::Sub:
+        - Stack ${AWS::StackName} Function ${ResourceName}
+        - ResourceName: ElastiCacheAlarmsFunction
+      CodeUri: s3://kyn-app-tokyo/AWS-Recommended-CloudWatch-Alarms-Generator/36725af3b8d31d29af90e4b8685a24cf
+      Handler: lambda_function.lambda_handler
+      Environment:
+        Variables:
+          NOTIFICATION_TOPIC:
+            Ref: AlarmNotificationTopic
+          S3_BUCKET:
+            Ref: CloudFormationBucket
+      Runtime: python3.10
+      MemorySize: 256
+      Timeout: 60
+      Tracing: Active
+      Role:
+        Fn::GetAtt:
+        - AlarmsGeneratorLambdaExecutionRole
+        - Arn
+      Events:
+        CronEvent:
+          Type: Schedule
+          Properties:
+            Schedule: cron(00 23 * * ? *)
+            Name: ElastiCacheAlarmsSchedule
+            Description: Trigger Lambda at 23:00 PM daily
+    Condition: ElastiCacheAlarmsEnabled
+    Metadata:
+      SamResourceId: ElastiCacheAlarmsFunction
+  ElastiCacheAlarmsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/lambda/${ElastiCacheAlarmsFunction}
+    Condition: ElastiCacheAlarmsEnabled
+    Metadata:
+      SamResourceId: ElastiCacheAlarmsFunctionLogGroup
+  RDSAlarmsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description:
+        Fn::Sub:
+        - Stack ${AWS::StackName} Function ${ResourceName}
+        - ResourceName: RDSAlarmsFunction
+      CodeUri: s3://kyn-app-tokyo/AWS-Recommended-CloudWatch-Alarms-Generator/ffaf63679ee153709980e371b00d76cf
+      Handler: lambda_function.lambda_handler
+      Environment:
+        Variables:
+          NOTIFICATION_TOPIC:
+            Ref: AlarmNotificationTopic
+          S3_BUCKET:
+            Ref: CloudFormationBucket
+      Runtime: python3.10
+      MemorySize: 256
+      Timeout: 60
+      Tracing: Active
+      Role:
+        Fn::GetAtt:
+        - AlarmsGeneratorLambdaExecutionRole
+        - Arn
+      Events:
+        CronEvent:
+          Type: Schedule
+          Properties:
+            Schedule: cron(00 23 * * ? *)
+            Name: RDSAlarmsSchedule
+            Description: Trigger Lambda at 23:00 PM daily
+    Condition: RDSAlarmsEnabled
+    Metadata:
+      SamResourceId: RDSAlarmsFunction
+  RDSAlarmsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/lambda/${RDSAlarmsFunction}
+    Condition: RDSAlarmsEnabled
+    Metadata:
+      SamResourceId: RDSAlarmsFunctionLogGroup
+Transform: AWS::Serverless-2016-10-31

@@ -1,0 +1,86 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+        "AlarmNotificationTopic": {
+            "Type": "String",
+            "Description": "SNS topic to notify when alarm is triggered"
+        }
+    },
+    "Resources" : {
+        "CPUUtilization": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmName": "AWS/EC2 CPUUtilization InstanceId=",
+                "MetricName": "CPUUtilization",
+                "Namespace": "AWS/EC2",
+                "Statistic": "Average",
+                "Dimensions": [
+                    {
+                        "Name": "InstanceId",
+                        "Value": ""
+                    }
+                ],
+                "Period": 300,
+                "EvaluationPeriods": 3,
+                "DatapointsToAlarm": 3,
+                "Threshold": 80,
+                "ComparisonOperator": "GreaterThanThreshold",
+                "TreatMissingData": "missing",
+                "ActionsEnabled": true,
+                "OKActions": [],
+                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "InsufficientDataActions": []
+            }
+        },
+        "StatusCheckFailed": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmName": "AWS/EC2 StatusCheckFailed InstanceId=",
+                "MetricName": "StatusCheckFailed",
+                "Namespace": "AWS/EC2",
+                "Statistic": "Maximum",
+                "Dimensions": [
+                    {
+                        "Name": "InstanceId",
+                        "Value": ""
+                    }
+                ],
+                "Period": 300,
+                "EvaluationPeriods": 2,
+                "DatapointsToAlarm": 2,
+                "Threshold": 1,
+                "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+                "TreatMissingData": "missing",
+                "ActionsEnabled": true,
+                "OKActions": [],
+                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "InsufficientDataActions": []
+            }
+        },
+        "StatusCheckFailedAttachedEBS": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmName": "AWS/EC2 StatusCheckFailedAttachedEBS InstanceId=",
+                "MetricName": "StatusCheckFailed_AttachedEBS",
+                "Namespace": "AWS/EC2",
+                "Statistic": "Maximum",
+                "Dimensions": [
+                    {
+                        "Name": "InstanceId",
+                        "Value": ""
+                    }
+                ],
+                "Period": 60,
+                "EvaluationPeriods": 10,
+                "DatapointsToAlarm": 10,
+                "Threshold": 1,
+                "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+                "TreatMissingData": "missing",
+                "ActionsEnabled": true,
+                "OKActions": [],
+                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "InsufficientDataActions": []
+            }
+        }
+    }
+}

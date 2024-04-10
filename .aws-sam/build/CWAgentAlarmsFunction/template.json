@@ -1,0 +1,89 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+        "AlarmNotificationTopic": {
+            "Type": "String",
+            "Description": "SNS topic to notify when alarm is triggered"
+        }
+    },
+    "Resources" : {
+        "MemUsedPercent": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmName": "CWAgent mem_used_percent InstanceId=",
+                "MetricName": "mem_used_percent",
+                "Namespace": "CWAgent",
+                "Statistic": "Average",
+                "Dimensions": [
+                    {
+                        "Name": "InstanceId",
+                        "Value": ""
+                    },
+                    {
+                        "Name": "ImageId",
+                        "Value": ""
+                    },
+                    {
+                        "Name": "InstanceType",
+                        "Value": ""
+                    }
+                ],
+                "Period": 300,
+                "EvaluationPeriods": 3,
+                "DatapointsToAlarm": 3,
+                "Threshold": 90,
+                "ComparisonOperator": "GreaterThanThreshold",
+                "TreatMissingData": "missing",
+                "ActionsEnabled": true,
+                "OKActions": [],
+                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "InsufficientDataActions": []
+            }
+        },
+        "DiskUsedPercent": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmName": "CWAgent disk_used_percent InstanceId=",
+                "MetricName": "disk_used_percent",
+                "Namespace": "CWAgent",
+                "Statistic": "Average",
+                "Dimensions": [
+                    {
+                        "Name": "path",
+                        "Value": ""
+                    },
+                    {
+                        "Name": "InstanceId",
+                        "Value": ""
+                    },
+                    {
+                        "Name": "ImageId",
+                        "Value": ""
+                    },
+                    {
+                        "Name": "InstanceType",
+                        "Value": ""
+                    },
+                    {
+                        "Name": "device",
+                        "Value": ""
+                    },
+                    {
+                        "Name": "fstype",
+                        "Value": ""
+                    }
+                ],
+                "Period": 300,
+                "EvaluationPeriods": 3,
+                "DatapointsToAlarm": 3,
+                "Threshold": 80,
+                "ComparisonOperator": "GreaterThanThreshold",
+                "TreatMissingData": "missing",
+                "ActionsEnabled": true,
+                "OKActions": [],
+                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "InsufficientDataActions": []
+            }
+        }
+    }
+}
