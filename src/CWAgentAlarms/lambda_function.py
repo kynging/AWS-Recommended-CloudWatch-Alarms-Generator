@@ -49,7 +49,11 @@ def lambda_handler(event, context):
         elif metric_name == 'disk_used_percent':
             if len(dimensions) == 6:
                 device = [x for x in dimensions if x['Name']=='device'][0]['Value']
+                if device == 'tmpfs' or device == 'devtmpfs':
+                    continue
                 fstype = [x for x in dimensions if x['Name']=='fstype'][0]['Value']
+                if fstype != 'xfs':
+                    continue
                 t = copy.deepcopy(template['Resources']['DiskUsedPercent'])
                 t['Properties']['AlarmName'] = t['Properties']['AlarmName'] + instance_id + ' ' + device
                 t['Properties']['Dimensions'] = dimensions
