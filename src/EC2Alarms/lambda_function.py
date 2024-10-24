@@ -2,6 +2,7 @@ import boto3
 import copy
 import json
 import os
+import re
 
 
 def lambda_handler(event, context):
@@ -42,12 +43,13 @@ def lambda_handler(event, context):
         elif dimensions[0]['Name'] != 'InstanceId':
             continue
         else:
-            instance_id = {i['Name']: i['Value'] for i in dimensions}['InstanceId']
+            instance_id = dimensions[0]['Value']
     
         t = copy.deepcopy(template['Resources'][metric_name.replace('_', '')])
         t['Properties']['AlarmName'] = t['Properties']['AlarmName'] + instance_id
         t['Properties']['Dimensions'] = dimensions
-        alarms_template['Resources'][metric_name.replace('_', '')+instance_id[2:]] = t
+        resource_name = re.sub('[^0-9a-zA-Z]+', '', metric_name+instance_id)
+        alarms_template['Resources'][resource_name] = t
         print(namespace, metric_name, instance_id)
     
     # put template into s3 (size limit 460800 bytes)
@@ -67,27 +69,30 @@ def lambda_handler(event, context):
     
     # submit cloudformation template
     try:
-        print(f'Checking if stack {stack_name} exists')
-        cfn.get_waiter('stack_exists').wait(StackName=stack_name,
-                                            WaiterConfig={'Delay': 3, 'MaxAttempts': 2})
-        
-        print(f'Stack {stack_name} exists, updating stack')
-        try:
-            cfn.update_stack(StackName=stack_name,
-                            TemplateURL=s3_url,
-                            Parameters=[{'ParameterKey': 'AlarmNotificationTopic',
-                                        'ParameterValue': notification_topic}])
-        except Exception as e:
-            print(e)
-
-    except:
-        print(f'Stack {stack_name} does not exist, creating stack')
-        cfn.create_stack(StackName=stack_name,
-                            TemplateURL=s3_url,
-                            Parameters=[{'ParameterKey': 'AlarmNotificationTopic',
-                                        'ParameterValue': notification_topic}])
+        cfn.create_stack(StackName=stack_name, 
+                         TemplateURL=s3_url,
+                         Parameters=[{'ParameterKey': 'AlarmNotificationTopic',
+                                      'ParameterValue': notification_topic}])
+        return {
+            'statusCode': 200,
+            'body': json.dumps('Successfully initiated new stack creation')
+        }
+    except Exception as e:
+        print(e)
+    
+    try:
+        cfn.update_stack(StackName=stack_name, 
+                         TemplateURL=s3_url,
+                         Parameters=[{'ParameterKey': 'AlarmNotificationTopic',
+                                      'ParameterValue': notification_topic}])
+        return {
+            'statusCode': 200,
+            'body': json.dumps('Successfully initiated stack update')
+        }
+    except Exception as e:
+        print(e)
           
     return {
-        'statusCode': 200,
-        'body': json.dumps('Success!')
+        'statusCode': 400,
+        'body': json.dumps('Lambda function ran with error')
     }
