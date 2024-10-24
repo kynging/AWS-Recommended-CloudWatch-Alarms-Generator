@@ -8,7 +8,7 @@ Metadata:
     ReadmeUrl: README.md
     Labels: ['CloudFormation', 'CloudWatch', 'Eventbridge']
     HomePageUrl: https://github.com/kynging/AWS-Recommended-CloudWatch-Alarms-Generator
-    SemanticVersion: 1.0.0
+    SemanticVersion: 1.0.1
     SourceCodeUrl: https://github.com/kynging/AWS-Recommended-CloudWatch-Alarms-Generator
 Parameters:
   AlarmNotificationTopic:
@@ -116,6 +116,7 @@ Resources:
             Statement:
             - Effect: Allow
               Action:
+              - CloudFormation:ListStacks
               - CloudFormation:DescribeStacks
               - CloudFormation:CreateStack
               - CloudFormation:UpdateStack

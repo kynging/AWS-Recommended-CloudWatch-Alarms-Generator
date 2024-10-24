@@ -37,22 +37,27 @@ def lambda_handler(event, context):
     for m in metrics:
         metric_name = m['MetricName']
         dimensions = m['Dimensions']
+
         if len(dimensions) != 3:
             continue
-        else:
-            instance_id = [x for x in dimensions if x['Name']=='InstanceId'][0]['Value']
     
         if metric_name == 'node_cpu_utilization':
+            instance_id = {i['Name']: i['Value'] for i in dimensions}['InstanceId']
+
             t = copy.deepcopy(template['Resources']['NodeCPUUtilization'])
             t['Properties']['AlarmName'] = t['Properties']['AlarmName'] + instance_id
             t['Properties']['Dimensions'] = dimensions
             alarms_template['Resources']['NodeCPUUtilization'+instance_id[2:]] = t
         if metric_name == 'node_filesystem_utilization':
+            instance_id = {i['Name']: i['Value'] for i in dimensions}['InstanceId']
+
             t = copy.deepcopy(template['Resources']['NodeFilesystemUtilization'])
             t['Properties']['AlarmName'] = t['Properties']['AlarmName'] + instance_id
             t['Properties']['Dimensions'] = dimensions
             alarms_template['Resources']['NodeFilesystemUtilization'+instance_id[2:]] = t
         if metric_name == 'node_memory_utilization':
+            instance_id = {i['Name']: i['Value'] for i in dimensions}['InstanceId']
+            
             t = copy.deepcopy(template['Resources']['NodeMemoryUtilization'])
             t['Properties']['AlarmName'] = t['Properties']['AlarmName'] + instance_id
             t['Properties']['Dimensions'] = dimensions
@@ -76,20 +81,25 @@ def lambda_handler(event, context):
 
     # submit cloudformation template
     try:
-        cfn.create_stack(StackName=stack_name,
-                         TemplateURL=s3_url,
-                         Parameters=[{'ParameterKey': 'AlarmNotificationTopic',
-                                      'ParameterValue': notification_topic}])
-    except Exception as e:
-        print(e)
+        print(f'Checking if stack {stack_name} exists')
+        cfn.get_waiter('stack_exists').wait(StackName=stack_name,
+                                            WaiterConfig={'Delay': 3, 'MaxAttempts': 2})
+        
+        print(f'Stack {stack_name} exists, updating stack')
+        try:
+            cfn.update_stack(StackName=stack_name,
+                            TemplateURL=s3_url,
+                            Parameters=[{'ParameterKey': 'AlarmNotificationTopic',
+                                        'ParameterValue': notification_topic}])
+        except Exception as e:
+            print(e)
 
-    try:
-        cfn.update_stack(StackName=stack_name,
-                         TemplateURL=s3_url,
-                         Parameters=[{'ParameterKey': 'AlarmNotificationTopic',
-                                      'ParameterValue': notification_topic}])
-    except Exception as e:
-        print(e)
+    except:
+        print(f'Stack {stack_name} does not exist, creating stack')
+        cfn.create_stack(StackName=stack_name,
+                            TemplateURL=s3_url,
+                            Parameters=[{'ParameterKey': 'AlarmNotificationTopic',
+                                        'ParameterValue': notification_topic}])
         
     return {
         'statusCode': 200,
