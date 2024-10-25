@@ -46,7 +46,7 @@ def lambda_handler(event, context):
                 t = copy.deepcopy(template['Resources'][metric_name])
                 t['Properties']['AlarmName'] = t['Properties']['AlarmName'] + cache_cluster_id + ' CacheNodeId=' + cache_node_id
                 t['Properties']['Dimensions'] = dimensions
-                resource_name = re.sub('[^0-9a-zA-Z]+', '', metric_name + cache_cluster_id)
+                resource_name = re.sub('[^0-9a-zA-Z]+', '', metric_name + cache_cluster_id + 'node' + cache_node_id)
                 alarms_template['Resources'][resource_name] = t
                 print(namespace, metric_name, cache_cluster_id, cache_node_id)
 
@@ -57,7 +57,7 @@ def lambda_handler(event, context):
                 t = copy.deepcopy(template['Resources'][metric_name])
                 t['Properties']['AlarmName'] = t['Properties']['AlarmName'] + cache_cluster_id
                 t['Properties']['Dimensions'] = dimensions
-                resource_name = re.sub('[^0-9a-zA-Z]+', '', metric_name+cache_cluster_id)
+                resource_name = re.sub('[^0-9a-zA-Z]+', '', metric_name + cache_cluster_id)
                 alarms_template['Resources'][resource_name] = t
                 print(namespace, metric_name, cache_cluster_id)
         
