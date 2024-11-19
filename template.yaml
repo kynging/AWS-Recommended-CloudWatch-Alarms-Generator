@@ -8,7 +8,7 @@ Metadata:
     ReadmeUrl: README.md
     Labels: ['CloudFormation', 'CloudWatch', 'Eventbridge']
     HomePageUrl: https://github.com/kynging/AWS-Recommended-CloudWatch-Alarms-Generator
-    SemanticVersion: 1.0.2
+    SemanticVersion: 1.0.4
     SourceCodeUrl: https://github.com/kynging/AWS-Recommended-CloudWatch-Alarms-Generator
 Parameters:
   AlarmNotificationTopic:
@@ -16,6 +16,12 @@ Parameters:
     Description: |-
       SNS topic to send notifications.
        Sample: arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::Account}:AlarmNotificationTopic
+  EventBridgeScheduleCron:
+    Type: String
+    Description: |-
+      Trigger Alarms Lambda to create or update alarms PublicAccessBlockConfiguration.
+        Sample: cron(00 23 * * ? *)
+    Default: cron(00 23 * * ? *)
   ContainerInsightsAlarms:
     Description: Specify whether to enable ContainerInsights CloudWatch Alarms
     Type: String
@@ -107,37 +113,41 @@ Resources:
           Principal:
             Service: lambda.amazonaws.com
           Action: sts:AssumeRole
-      RoleName: AlarmsGeneratorLambdaExecutionRole
+      RoleName: !Sub AlarmsGeneratorLambdaExecutionRole-${AWS::Region}
       Description: Lambda Execution Role for granting access to CloudWatch and CloudFormation to generate CloudWatch Alarms
-      Policies:
-        - PolicyName: AlarmsGeneratorPolicy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-            - Effect: Allow
-              Action:
-              - CloudFormation:ListStacks
-              - CloudFormation:DescribeStacks
-              - CloudFormation:CreateStack
-              - CloudFormation:UpdateStack
-              Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/CloudWatchAlarms*
-            - Effect: Allow
-              Action:
-              - cloudwatch:ListMetrics
-              - cloudwatch:PutMetricAlarm
-              - cloudwatch:DeleteAlarms
-              Resource: '*'
-            - Effect: Allow
-              Action:
-              - logs:CreateLogGroup
-              - logs:CreateLogStream
-              - logs:PutLogEvents
-              Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}*:*
-            - Effect: Allow
-              Action:
-              - S3:GetObject
-              - S3:PutObject
-              Resource: !Sub arn:${AWS::Partition}:s3:::${CloudFormationBucket}/*
+  AlarmsGeneratorPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: AlarmsGeneratorPolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Allow
+          Action:
+          - CloudFormation:ListStacks
+          - CloudFormation:DescribeStacks
+          - CloudFormation:CreateStack
+          - CloudFormation:UpdateStack
+          Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/CloudWatchAlarms*
+        - Effect: Allow
+          Action:
+          - cloudwatch:ListMetrics
+          - cloudwatch:PutMetricAlarm
+          - cloudwatch:DeleteAlarms
+          Resource: '*'
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}*:*
+        - Effect: Allow
+          Action:
+          - S3:GetObject
+          - S3:PutObject
+          Resource: !Sub arn:${AWS::Partition}:s3:::${CloudFormationBucket}/*
+      Roles: 
+      - !Sub AlarmsGeneratorLambdaExecutionRole-${AWS::Region}
   EC2AlarmsFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -159,9 +169,9 @@ Resources:
         CronEvent:
           Type: Schedule
           Properties:
-            Schedule: cron(00 23 * * ? *)
+            Schedule: !Ref EventBridgeScheduleCron
             Name: EC2AlarmsSchedule
-            Description: Trigger Lambda at 23:00 PM daily
+            Description: Trigger Lambda by schedule
     Condition: EC2AlarmsEnabled
   EC2AlarmsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
@@ -190,9 +200,9 @@ Resources:
         CronEvent:
           Type: Schedule
           Properties:
-            Schedule: cron(00 23 * * ? *)
+            Schedule: !Ref EventBridgeScheduleCron
             Name: CWAgentAlarmsSchedule
-            Description: Trigger Lambda at 23:00 PM daily
+            Description: Trigger Lambda by schedule
     Condition: CWAgentAlamrsEnabled
   CWAgentAlarmsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
@@ -221,9 +231,9 @@ Resources:
         CronEvent:
           Type: Schedule
           Properties:
-            Schedule: cron(00 23 * * ? *)
+            Schedule: !Ref EventBridgeScheduleCron
             Name: ContainerInsightsAlarmsSchedule
-            Description: Trigger Lambda at 23:00 PM daily
+            Description: Trigger Lambda by schedule
     Condition: ContainerInsightsAlarmsEnabled
   ContainerInsightsAlarmsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
@@ -252,9 +262,9 @@ Resources:
         CronEvent:
           Type: Schedule
           Properties:
-            Schedule: cron(00 23 * * ? *)
+            Schedule: !Ref EventBridgeScheduleCron
             Name: ElastiCacheAlarmsSchedule
-            Description: Trigger Lambda at 23:00 PM daily
+            Description: Trigger Lambda by schedule
     Condition: ElastiCacheAlarmsEnabled
   ElastiCacheAlarmsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
@@ -283,9 +293,9 @@ Resources:
         CronEvent:
           Type: Schedule
           Properties:
-            Schedule: cron(00 23 * * ? *)
+            Schedule: !Ref EventBridgeScheduleCron
             Name: RDSAlarmsSchedule
-            Description: Trigger Lambda at 23:00 PM daily
+            Description: Trigger Lambda by schedule
     Condition: RDSAlarmsEnabled
   RDSAlarmsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
