@@ -44,7 +44,10 @@ def lambda_handler(event, context):
         metric_name = m['MetricName']
         dimensions = m['Dimensions']
         if len(dimensions) == 2:
-            role = {i['Name']: i['Value'] for i in m['Dimensions']}['Role']
+            if 'Role' in {i['Name']: i['Value'] for i in m['Dimensions']}.keys():
+                role = {i['Name']: i['Value'] for i in m['Dimensions']}['Role']
+            else: 
+                continue
             db_cluster_identifier = {i['Name']: i['Value'] for i in m['Dimensions']}['DBClusterIdentifier']
             t = copy.deepcopy(template['Resources'][metric_name.replace('%', '')])
             t['Properties']['AlarmName'] = t['Properties']['AlarmName'] + role + ' DBClusterIdentifier=' + db_cluster_identifier
