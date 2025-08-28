@@ -1,11 +1,5 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
-    "Parameters": {
-        "AlarmNotificationTopic": {
-            "Type": "String",
-            "Description": "SNS topic to notify when alarm is triggered"
-        }
-    },
     "Resources": {
         "CPUUtilization": {
             "Type": "AWS::CloudWatch::Alarm",
@@ -32,7 +26,7 @@
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -61,7 +55,7 @@
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -86,7 +80,7 @@
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -111,7 +105,7 @@
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -136,7 +130,7 @@
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         }

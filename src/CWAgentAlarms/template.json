@@ -1,16 +1,11 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
-    "Parameters": {
-        "AlarmNotificationTopic": {
-            "Type": "String",
-            "Description": "SNS topic to notify when alarm is triggered"
-        }
-    },
     "Resources" : {
         "MemUsedPercent": {
             "Type": "AWS::CloudWatch::Alarm",
             "Properties": {
                 "AlarmName": "CWAgent mem_used_percent InstanceId=",
+                "AlarmDescription": "",
                 "MetricName": "mem_used_percent",
                 "Namespace": "CWAgent",
                 "Statistic": "Average",
@@ -36,14 +31,14 @@
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
         "DiskUsedPercent": {
             "Type": "AWS::CloudWatch::Alarm",
             "Properties": {
-                "AlarmName": "CWAgent disk_used_percent InstanceId=",
+                "AlarmName": "CWAgent disk_used_percent InstanceId= device=",
                 "MetricName": "disk_used_percent",
                 "Namespace": "CWAgent",
                 "Statistic": "Average",
@@ -81,7 +76,7 @@
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         }

@@ -1,11 +1,5 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
-    "Parameters": {
-        "AlarmNotificationTopic": {
-            "Type": "String",
-            "Description": "SNS topic to notify when alarm is triggered"
-        }
-    },
     "Resources": {
         "CPUUtilization": {
             "Type": "AWS::CloudWatch::Alarm",
@@ -28,7 +22,7 @@
                 "TreatMissingData": "breaching",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -53,7 +47,7 @@
                 "TreatMissingData": "breaching",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -78,7 +72,7 @@
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -103,7 +97,7 @@
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -128,7 +122,7 @@
                 "TreatMissingData": "breaching",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -153,7 +147,7 @@
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -178,7 +172,7 @@
                 "TreatMissingData": "breaching",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -203,7 +197,7 @@
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -228,7 +222,7 @@
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -253,7 +247,7 @@
                 "TreatMissingData": "breaching",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -278,7 +272,7 @@
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -298,12 +292,12 @@
                 "Period": 60,
                 "EvaluationPeriods": 15,
                 "DatapointsToAlarm": 15,
-                "Threshold": "100",
+                "Threshold": 100,
                 "ComparisonOperator": "GreaterThanThreshold",
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -323,26 +317,26 @@
                 "Period": 60,
                 "EvaluationPeriods": 5,
                 "DatapointsToAlarm": 5,
-                "Threshold": "1099511627776",
+                "Threshold": 1099511627776,
                 "ComparisonOperator": "LessThanThreshold",
                 "TreatMissingData": "breaching",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
         "AuroraBinlogReplicaLag": {
             "Type": "AWS::CloudWatch::Alarm",
             "Properties": {
-                "AlarmName": "AWS/RDS AuroraBinlogReplicaLag Role=",
+                "AlarmName": "AWS/RDS AuroraBinlogReplicaLag DBClusterIdentifier=",
                 "MetricName": "AuroraBinlogReplicaLag",
                 "Namespace": "AWS/RDS",
                 "Statistic": "Average",
                 "Dimensions": [
                     {
                         "Name": "Role",
-                        "Value": "WRITER"
+                        "Value": ""
                     },
                     {
                         "Name": "DBClusterIdentifier",
@@ -357,7 +351,7 @@
                 "TreatMissingData": "breaching",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -382,7 +376,7 @@
                 "TreatMissingData": "notBreaching",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -407,14 +401,14 @@
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
         "EngineUptime": {
             "Type": "AWS::CloudWatch::Alarm",
             "Properties": {
-                "AlarmName": "AWS/RDS EngineUptime Role=",
+                "AlarmName": "AWS/RDS EngineUptime DBClusterIdentifier=",
                 "MetricName": "EngineUptime",
                 "Namespace": "AWS/RDS",
                 "Statistic": "Average",
@@ -436,7 +430,7 @@
                 "TreatMissingData": "breaching",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
@@ -461,14 +455,14 @@
                 "TreatMissingData": "breaching",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         },
         "StorageNetworkThroughput": {
             "Type": "AWS::CloudWatch::Alarm",
             "Properties": {
-                "AlarmName": "AWS/RDS StorageNetworkThroughput Role=",
+                "AlarmName": "AWS/RDS StorageNetworkThroughput DBClusterIdentifier=",
                 "MetricName": "StorageNetworkThroughput",
                 "Namespace": "AWS/RDS",
                 "Statistic": "Average",
@@ -485,12 +479,12 @@
                 "Period": 60,
                 "EvaluationPeriods": 5,
                 "DatapointsToAlarm": 5,
-                "Threshold": "1073741824",
+                "Threshold": 1073741824,
                 "ComparisonOperator": "GreaterThanThreshold",
                 "TreatMissingData": "missing",
                 "ActionsEnabled": true,
                 "OKActions": [],
-                "AlarmActions": [{ "Ref" : "AlarmNotificationTopic" }],
+                "AlarmActions": [],
                 "InsufficientDataActions": []
             }
         }

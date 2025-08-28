@@ -1,4 +1,5 @@
 import boto3
+import botocore
 import copy
 import json
 import os
@@ -8,58 +9,94 @@ import re
 def lambda_handler(event, context):
 
     notification_topic = os.environ['NOTIFICATION_TOPIC']
+    notification_enabled = (notification_topic!='')
     s3_bucket = os.environ['S3_BUCKET']
-    stack_name = 'CloudWatchAlarmsElastiCache'
+    stack_name = os.environ['STACK_NAME']
+    namespace = os.environ['NAMESPACE']
     
     session = boto3.session.Session()
     cw = session.client('cloudwatch')
     cfn = session.client('cloudformation')
+    elasticache = session.client('elasticache')
     s3 = session.client('s3')
     
     # open base template
     with open('template.json') as f:
         template = json.loads(f.read())
     f.close()
+    metric_name_mapping = {}
+    for i in template['Resources']:
+        if template['Resources'][i]['Properties']['MetricName'] not in metric_name_mapping:
+            metric_name_mapping[template['Resources'][i]['Properties']['MetricName']] = []
+        metric_name_mapping[template['Resources'][i]['Properties']['MetricName']].append(i)
+            
     alarms_template = {'AWSTemplateFormatVersion': template['AWSTemplateFormatVersion'],
-                       'Parameters': template['Parameters'],
+                       # 'Parameters': template['Parameters'],
                        'Resources': {}}
     
     # list cloudwatch metrics
-    namespace = 'AWS/ElastiCache'
     response = cw.list_metrics(Namespace=namespace)
     metrics = response['Metrics']
     while 'NextToken' in response.keys():
         response = cw.list_metrics(Namespace=namespace, NextToken=response['NextToken'])
         metrics = metrics + response['Metrics']
-        
-    metrics = [x for x in metrics if x['MetricName'] in ['CPUUtilization', 'CurrConnections', 'EngineCPUUtilization', 'DatabaseMemoryUsagePercentage', 'ReplicationLag']]
     
     # generate cloudformation template
     for m in metrics:
+        ## check metric name
         metric_name = m['MetricName']
+        if metric_name not in metric_name_mapping.keys():
+            continue
+
         dimensions = m['Dimensions']
-        if len(dimensions) == 2:
-            if m['MetricName'] == 'CPUUtilization' or m['MetricName'] == 'CurrConnections':
-                cache_cluster_id = {i['Name']: i['Value'] for i in m['Dimensions']}['CacheClusterId']
-                cache_node_id = {i['Name']: i['Value'] for i in m['Dimensions']}['CacheNodeId']
-
-                t = copy.deepcopy(template['Resources'][metric_name])
-                t['Properties']['AlarmName'] = t['Properties']['AlarmName'] + cache_cluster_id + ' CacheNodeId=' + cache_node_id
-                t['Properties']['Dimensions'] = dimensions
-                resource_name = re.sub('[^0-9a-zA-Z]+', '', metric_name + cache_cluster_id + 'node' + cache_node_id)
-                alarms_template['Resources'][resource_name] = t
-                print(namespace, metric_name, cache_cluster_id, cache_node_id)
-
-        elif len(dimensions) == 1:
-            if dimensions[0]['Name'] == 'CacheClusterId':
-                cache_cluster_id = dimensions[0]['Value']
     
-                t = copy.deepcopy(template['Resources'][metric_name])
-                t['Properties']['AlarmName'] = t['Properties']['AlarmName'] + cache_cluster_id
-                t['Properties']['Dimensions'] = dimensions
-                resource_name = re.sub('[^0-9a-zA-Z]+', '', metric_name + cache_cluster_id)
-                alarms_template['Resources'][resource_name] = t
-                print(namespace, metric_name, cache_cluster_id)
+        ## iterate every resource for this metric name
+        resources = metric_name_mapping[metric_name]
+        for r in resources:
+            ### check if dimensions exact match
+            if not sorted([i['Name'] for i in dimensions]) == sorted([i['Name'] for i in template['Resources'][r]['Properties']['Dimensions']]):
+                print(namespace, metric_name, 'dimensions', sorted([i['Name'] for i in dimensions]), 'don\'t match template requirement', sorted([i['Name'] for i in template['Resources'][r]['Properties']['Dimensions']]))
+                continue
+            
+            ### cache node id is quite useless, only need cache cluster id
+            cache_cluster_id = {i['Name']: i['Value'] for i in m['Dimensions']}['CacheClusterId']
+            
+            try:
+                response = elasticache.describe_cache_clusters(CacheClusterId=cache_cluster_id)
+                response = elasticache.list_tags_for_resource(ResourceName=response['CacheClusters'][0]['ARN'])
+                tags = {i['Key']:i['Value'] for i in response['TagList']}
+                tags = str(tags)[1:-1].replace('\'', '').replace(', ', '\n')
+            except elasticache.exceptions.CacheClusterNotFoundFault:
+                print(namespace, cache_cluster_id, 'cache cluster not found')
+                continue
+            except Exception as e:
+                tags = ''
+                print(e)
+                continue
+                
+            ### you can define your own alarm description format here
+            alarm_description = '{}\n'.format(tags)
+            ### you can define alarm name here
+            alarm_name = '{} {} CacheClusterId={}'.format(namespace, metric_name, cache_cluster_id)
+            ### you can define CloudFormation resource name here
+            resource_name = re.sub('[^0-9a-zA-Z]+', '', r+cache_cluster_id)
+    
+            ### copy CloudFormation template from template
+            t = copy.deepcopy(template['Resources'][r])
+            ### set alarm name
+            t['Properties']['AlarmName'] = alarm_name
+            ### set dimensions value
+            t['Properties']['Dimensions'] = dimensions
+            ### set notification
+            if notification_enabled:
+                t['Properties']['ActionsEnabled'] = True
+                t['Properties']['AlarmActions'] = [notification_topic]
+            else:
+                t['Properties']['ActionsEnabled'] = False
+                t['Properties']['AlarmActions'] = []
+            ### generate final template
+            alarms_template['Resources'][resource_name] = t
+            print(alarm_name, 'OK')
         
     # put template into s3 (size limit 460800 bytes)
     s3.put_object(
@@ -78,26 +115,31 @@ def lambda_handler(event, context):
     
     # submit cloudformation template
     try:
-        cfn.create_stack(StackName=stack_name,
-                         TemplateURL=s3_url,
-                         Parameters=[{'ParameterKey': 'AlarmNotificationTopic',
-                                      'ParameterValue': notification_topic}])
+        cfn.create_stack(StackName=stack_name, TemplateURL=s3_url)
         return {
             'statusCode': 200,
             'body': json.dumps('Successfully initiated new stack creation')
         }
+    except cfn.exceptions.AlreadyExistsException:
+        pass
     except Exception as e:
         print(e)
 
     try:
-        cfn.update_stack(StackName=stack_name,
-                         TemplateURL=s3_url,
-                         Parameters=[{'ParameterKey': 'AlarmNotificationTopic',
-                                      'ParameterValue': notification_topic}])
+        cfn.update_stack(StackName=stack_name, TemplateURL=s3_url)
         return {
             'statusCode': 200,
             'body': json.dumps('Successfully initiated stack update')
         }
+    except botocore.exceptions.ClientError as e:
+        if e.response['Error']['Message'] == 'No updates are to be performed.':
+            print('*** No updates are to be performed. ***')
+            return {
+                'statusCode': 200,
+                'body': json.dumps('Successfully initiated stack update')
+            }
+        else:
+            print(e)
     except Exception as e:
         print(e)
 

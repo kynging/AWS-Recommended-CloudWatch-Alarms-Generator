@@ -8,22 +8,23 @@ Metadata:
     ReadmeUrl: README.md
     Labels: ['CloudFormation', 'CloudWatch', 'Eventbridge']
     HomePageUrl: https://github.com/kynging/AWS-Recommended-CloudWatch-Alarms-Generator
-    SemanticVersion: 1.0.5
+    SemanticVersion: 1.0.8
     SourceCodeUrl: https://github.com/kynging/AWS-Recommended-CloudWatch-Alarms-Generator
 Parameters:
   AlarmNotificationTopic:
     Type: String
     Description: |-
-      SNS topic to send notifications.
+      SNS topic to send notifications. LEAVE THIS EMPTY if you don't want CloudWatch to create any forward action. If you enter a wrong or non-existent SNS topic, the alamrs creation will throw errors.
        Sample: arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::Account}:AlarmNotificationTopic
+    Default: ""
   EventBridgeScheduleCron:
     Type: String
     Description: |-
-      Trigger Alarms Lambda to create or update alarms PublicAccessBlockConfiguration.
+      Create a EventBridge cron schedule to trigger Alarms Lambda to create or update alarms.
         Sample: cron(00 23 * * ? *)
     Default: cron(00 23 * * ? *)
   ContainerInsightsAlarms:
-    Description: Specify whether to enable ContainerInsights CloudWatch Alarms
+    Description: Specify whether to enable ContainerInsights CloudWatch Alarms. Allowed values are "Enabled" or "Disabled".
     Type: String
     AllowedValues:
       - Enabled
@@ -146,6 +147,15 @@ Resources:
           - S3:GetObject
           - S3:PutObject
           Resource: !Sub arn:${AWS::Partition}:s3:::${CloudFormationBucket}/*
+        - Effect: Allow
+          Action:
+          - ec2:DescribeInstances
+          - rds:ListTagsForResource
+          - rds:DescribeDBInstances
+          - elasticache:DescribeCacheClusters
+          - rds:DescribeDBClusters
+          - elasticache:ListTagsForResource
+          Resource: '*'
       Roles: 
       - !Sub AlarmsGeneratorLambdaExecutionRole-${AWS::Region}
   EC2AlarmsFunction:
@@ -160,7 +170,9 @@ Resources:
         Variables:
           NOTIFICATION_TOPIC: !Ref AlarmNotificationTopic
           S3_BUCKET: !Ref CloudFormationBucket
-      Runtime: python3.10
+          STACK_NAME: CloudWatchAlarmsEC2
+          NAMESPACE: AWS/EC2
+      Runtime: python3.12
       MemorySize: 256
       Timeout: 60
       Tracing: Active
@@ -191,7 +203,9 @@ Resources:
         Variables:
           NOTIFICATION_TOPIC: !Ref AlarmNotificationTopic
           S3_BUCKET: !Ref CloudFormationBucket
-      Runtime: python3.10
+          STACK_NAME: CloudWatchAlarmsCWAgent
+          NAMESPACE: CWAgent
+      Runtime: python3.12
       MemorySize: 256
       Timeout: 60
       Tracing: Active
@@ -222,7 +236,9 @@ Resources:
         Variables:
           NOTIFICATION_TOPIC: !Ref AlarmNotificationTopic
           S3_BUCKET: !Ref CloudFormationBucket
-      Runtime: python3.10
+          STACK_NAME: CloudWatchAlarmsContainerInsights
+          NAMESPACE: ContainerInsights
+      Runtime: python3.12
       MemorySize: 256
       Timeout: 60
       Tracing: Active
@@ -253,7 +269,9 @@ Resources:
         Variables:
           NOTIFICATION_TOPIC: !Ref AlarmNotificationTopic
           S3_BUCKET: !Ref CloudFormationBucket
-      Runtime: python3.10
+          STACK_NAME: CloudWatchAlarmsElastiCache
+          NAMESPACE: AWS/ElastiCache
+      Runtime: python3.12
       MemorySize: 256
       Timeout: 60
       Tracing: Active
@@ -284,7 +302,9 @@ Resources:
         Variables:
           NOTIFICATION_TOPIC: !Ref AlarmNotificationTopic
           S3_BUCKET: !Ref CloudFormationBucket
-      Runtime: python3.10
+          STACK_NAME: CloudWatchAlarmsRDS
+          NAMESPACE: AWS/RDS
+      Runtime: python3.12
       MemorySize: 256
       Timeout: 60
       Tracing: Active
