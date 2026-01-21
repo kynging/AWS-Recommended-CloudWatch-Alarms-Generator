@@ -8,7 +8,7 @@ Metadata:
     ReadmeUrl: README.md
     Labels: ['CloudFormation', 'CloudWatch', 'Eventbridge']
     HomePageUrl: https://github.com/kynging/AWS-Recommended-CloudWatch-Alarms-Generator
-    SemanticVersion: 1.0.8
+    SemanticVersion: 1.0.9
     SourceCodeUrl: https://github.com/kynging/AWS-Recommended-CloudWatch-Alarms-Generator
 Parameters:
   AlarmNotificationTopic:
@@ -62,7 +62,7 @@ Conditions:
   EC2AlarmsEnabled: !Equals
     - !Ref EC2Alarms
     - Enabled
-  CWAgentAlamrsEnabled: !Equals
+  CWAgentAlarmsEnabled: !Equals
     - !Ref CWAgentAlarms
     - Enabled
   ContainerInsightsAlarmsEnabled: !Equals
@@ -217,13 +217,13 @@ Resources:
             Schedule: !Ref EventBridgeScheduleCron
             Name: CWAgentAlarmsSchedule
             Description: Trigger Lambda by schedule
-    Condition: CWAgentAlamrsEnabled
+    Condition: CWAgentAlarmsEnabled
   CWAgentAlarmsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Retain
     Properties:
       LogGroupName: !Sub /aws/lambda/${CWAgentAlarmsFunction}
-    Condition: CWAgentAlamrsEnabled
+    Condition: CWAgentAlarmsEnabled
   ContainerInsightsAlarmsFunction:
     Type: AWS::Serverless::Function
     Properties:
