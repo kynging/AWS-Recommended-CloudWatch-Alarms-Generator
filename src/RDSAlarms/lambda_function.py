@@ -3,10 +3,8 @@ import copy
 import json
 import os
 import re
-import sys
 
-# Import common utilities
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Import common utilities from Lambda Layer
 from common import (
     load_template,
     build_metric_name_mapping,
