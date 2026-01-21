@@ -1,0 +1,252 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.12'
+  SAM_CLI_VERSION: latest
+
+jobs:
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      
+      - name: Run Black formatter check
+        run: black --check --diff src/ tests/
+      
+      - name: Run isort import check
+        run: isort --check-only --diff src/ tests/
+      
+      - name: Run flake8 linting
+        run: flake8 src/ tests/ --max-line-length=100 --extend-ignore=E203,W503
+      
+      - name: Run Bandit security checks
+        run: bandit -r src/ -f json -o bandit-report.json || true
+      
+      - name: Upload Bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      
+      - name: Run unit tests with coverage
+        run: |
+          pytest tests/unit/ -v \
+            --cov=src \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-report=html \
+            --junit-xml=test-results.xml
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            test-results.xml
+            htmlcov/
+      
+      - name: Publish test report
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: 'test-results.xml'
+          check_name: Unit Test Report
+
+  sam-validate:
+    name: SAM Template Validation
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Set up AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+        with:
+          version: ${{ env.SAM_CLI_VERSION }}
+      
+      - name: Validate SAM template
+        run: sam validate --lint
+      
+      - name: SAM build
+        run: sam build
+
+  sam-deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [test, sam-validate]
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment:
+      name: staging
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Set up AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+        with:
+          version: ${{ env.SAM_CLI_VERSION }}
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: SAM build
+        run: sam build
+      
+      - name: SAM deploy to staging
+        run: |
+          sam deploy \
+            --stack-name aws-cloudwatch-alarms-generator-staging \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+            --region ${{ secrets.AWS_REGION }} \
+            --parameter-overrides \
+              AlarmNotificationTopic="${{ secrets.STAGING_SNS_TOPIC }}" \
+              EventBridgeScheduleCron="cron(0 23 * * ? *)" \
+            --no-fail-on-empty-changeset \
+            --no-confirm-changeset
+
+  sam-deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [test, sam-validate]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Set up AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+        with:
+          version: ${{ env.SAM_CLI_VERSION }}
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: SAM build
+        run: sam build
+      
+      - name: SAM deploy to production
+        run: |
+          sam deploy \
+            --stack-name aws-cloudwatch-alarms-generator-prod \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+            --region ${{ secrets.AWS_REGION }} \
+            --parameter-overrides \
+              AlarmNotificationTopic="${{ secrets.PROD_SNS_TOPIC }}" \
+              EventBridgeScheduleCron="cron(0 23 * * ? *)" \
+            --no-fail-on-empty-changeset \
+            --no-confirm-changeset
+
+  publish-to-sar:
+    name: Publish to AWS Serverless Application Repository
+    runs-on: ubuntu-latest
+    needs: sam-deploy-production
+    if: github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'release:')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Set up AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+        with:
+          version: ${{ env.SAM_CLI_VERSION }}
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1  # SAR requires us-east-1
+      
+      - name: SAM build
+        run: sam build
+      
+      - name: SAM publish
+        run: |
+          sam publish \
+            --template packaged.yaml \
+            --region us-east-1

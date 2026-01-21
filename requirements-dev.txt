@@ -1,0 +1,36 @@
+# Testing dependencies
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+pytest-xdist==3.5.0
+moto==4.2.10  # AWS service mocking library
+
+# Code quality and linting
+black==23.12.1
+flake8==6.1.0
+flake8-docstrings==1.7.0
+flake8-bugbear==23.12.2
+isort==5.13.2
+pylint==3.0.3
+mypy==1.7.1
+bandit==1.7.6  # Security linting
+
+# Pre-commit hooks
+pre-commit==3.6.0
+
+# AWS development tools
+boto3-stubs[essential]==1.34.11
+boto3-stubs[cloudwatch]==1.34.11
+boto3-stubs[cloudformation]==1.34.11
+boto3-stubs[ec2]==1.34.11
+boto3-stubs[rds]==1.34.11
+boto3-stubs[elasticache]==1.34.11
+boto3-stubs[s3]==1.34.11
+
+# Documentation
+mkdocs==1.5.3
+mkdocs-material==9.5.3
+
+# Development utilities
+ipython==8.19.0
+ipdb==0.13.13
